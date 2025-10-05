@@ -159,16 +159,31 @@ export function ModelConfig({ onClose }: Props): React.ReactNode {
         setSelectedIndex(prev => Math.max(0, prev - 1))
       } else if (key.downArrow) {
         setSelectedIndex(prev => Math.min(menuItems.length - 1, prev + 1))
-      } else if (key.return || input === ' ') {
+      } else if (key.return) {
         const setting = menuItems[selectedIndex]
 
         if (isDeleteMode && setting.type === 'modelPointer' && setting.value) {
-          // Delete mode: clear the pointer assignment (not delete the model config)
+          // Delete mode: clear the pointer assignment
           setModelPointer(setting.id as ModelPointerType, '')
           setRefreshKey(prev => prev + 1)
-          setIsDeleteMode(false) // Exit delete mode after clearing assignment
+          setIsDeleteMode(false)
         } else if (setting.type === 'modelPointer') {
-          // Normal mode: cycle through available models
+          // Enter: open model selector for configuration
+          setCurrentPointer(setting.id as ModelPointerType)
+          setShowModelSelector(true)
+        } else if (setting.type === 'action') {
+          setting.onChange()
+        }
+      } else if (input === ' ') {
+        const setting = menuItems[selectedIndex]
+
+        if (isDeleteMode && setting.type === 'modelPointer' && setting.value) {
+          // Delete mode: clear the pointer assignment
+          setModelPointer(setting.id as ModelPointerType, '')
+          setRefreshKey(prev => prev + 1)
+          setIsDeleteMode(false)
+        } else if (setting.type === 'modelPointer') {
+          // Space: cycle through configured models
           if (setting.options.length === 0) {
             // No models available, redirect to model library management
             handleManageModels()
@@ -182,9 +197,6 @@ export function ModelConfig({ onClose }: Props): React.ReactNode {
           if (nextOption) {
             setting.onChange(nextOption.id)
           }
-        } else if (setting.type === 'action') {
-          // Execute action (like "Add New Model")
-          setting.onChange()
         }
       }
     },
