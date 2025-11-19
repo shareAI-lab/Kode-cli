@@ -7,6 +7,7 @@ const GPT5_CAPABILITIES: ModelCapabilities = {
     fallback: 'chat_completions'
   },
   parameters: {
+    // TODO: use model capability in adapter
     maxTokensField: 'max_completion_tokens',
     supportsReasoningEffort: true,
     supportsVerbosity: true,
@@ -123,12 +124,12 @@ export function inferModelCapabilities(modelName: string): ModelCapabilities | n
     }
   }
   
-  // GLM series
+  // GLM series - Use Chat Completions API
   if (lowerName.includes('glm-5') || lowerName.includes('glm5')) {
     return {
-      ...GPT5_CAPABILITIES,
+      ...CHAT_COMPLETIONS_CAPABILITIES,
       toolCalling: {
-        ...GPT5_CAPABILITIES.toolCalling,
+        ...CHAT_COMPLETIONS_CAPABILITIES.toolCalling,
         supportsAllowedTools: false  // GLM might not support this
       }
     }

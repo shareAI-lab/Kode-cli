@@ -4,31 +4,32 @@ import { getModelManager } from '../../utils/model'
 import { UserMessage, AssistantMessage } from '../../services/claude'
 import { getGlobalConfig } from '../../utils/config'
 import { ModelAdapterFactory } from '../../services/modelAdapterFactory'
+import { productionTestModels, getChatCompletionsModels, getResponsesAPIModels } from '../testAdapters'
 
-const GPT5_CODEX_PROFILE = {
-  name: 'gpt-5-codex',
-  provider: 'openai',
-  modelName: 'gpt-5-codex',
-  baseURL: process.env.TEST_GPT5_BASE_URL || 'http://127.0.0.1:3000/openai',
-  apiKey: process.env.TEST_GPT5_API_KEY || '',
-  maxTokens: 8192,
-  contextLength: 128000,
-  reasoningEffort: 'high',
-  isActive: true,
-  createdAt: Date.now(),
-}
+// Use only production models from testAdapters - these require API keys
+const ACTIVE_PRODUCTION_MODELS = productionTestModels.filter(model => model.isActive)
+const CHAT_COMPLETIONS_MODELS = getChatCompletionsModels(ACTIVE_PRODUCTION_MODELS)
+const RESPONSES_API_MODELS = getResponsesAPIModels(ACTIVE_PRODUCTION_MODELS)
 
-const MINIMAX_CODEX_PROFILE = {
-  name: 'MiniMax',
-  provider: 'minimax',
-  modelName: 'MiniMax-M2',
-  baseURL: process.env.TEST_CHAT_COMPLETIONS_BASE_URL || 'https://api.minimax.chat/v1',
-  apiKey: process.env.TEST_CHAT_COMPLETIONS_API_KEY || '',
-  maxTokens: 8192,
-  contextLength: 128000,
-  reasoningEffort: 'medium',
-  isActive: true,
-  createdAt: Date.now(),
+// Model selection - only uses active production models from testAdapters
+function getGPT5Profile(): ModelProfile {
+  if (ACTIVE_PRODUCTION_MODELS.length === 0) {
+    throw new Error(
+      `No active production models found in testAdapters. Please set environment variables:\n` +
+      `TEST_GPT5_API_KEY, TEST_MINIMAX_API_KEY, TEST_DEEPSEEK_API_KEY, TEST_CLAUDE_API_KEY, or TEST_GLM_API_KEY`
+    )
+  }
+
+  if (RESPONSES_API_MODELS.length === 0) {
+    throw new Error(
+      `No active Responses API production models found. Available active models: ${ACTIVE_PRODUCTION_MODELS
+        .map(m => `${m.name} (${m.modelName})`)
+        .join(', ')}`
+    )
+  }
+
+  // Simply return the first Responses API model for GPT5 tests
+  return RESPONSES_API_MODELS[0]
 }
 
 describe('Integration: Multi-Turn CLI Flow', () => {
@@ -40,8 +41,9 @@ describe('Integration: Multi-Turn CLI Flow', () => {
 
     // This is the exact scenario that failed before the fix
     // Use direct adapter call to avoid model manager complexity
-    const adapter = ModelAdapterFactory.createAdapter(GPT5_CODEX_PROFILE)
-    const shouldUseResponses = ModelAdapterFactory.shouldUseResponsesAPI(GPT5_CODEX_PROFILE)
+    const gpt5Profile = getGPT5Profile()
+    const adapter = ModelAdapterFactory.createAdapter(gpt5Profile)
+    const shouldUseResponses = ModelAdapterFactory.shouldUseResponsesAPI(gpt5Profile)
 
     if (!shouldUseResponses) {
       console.log('  ⚠️  Skipping: Model does not support Responses API')
@@ -59,7 +61,7 @@ describe('Integration: Multi-Turn CLI Flow', () => {
     })
 
     const { callGPT5ResponsesAPI } = await import('../../services/openai')
-    const response = await callGPT5ResponsesAPI(GPT5_CODEX_PROFILE, request)
+    const response = await callGPT5ResponsesAPI(getGPT5Profile(), request)
     const unifiedResponse = await adapter.parseResponse(response)
 
     console.log(`  📄 Content: "${JSON.stringify(unifiedResponse.content)}"`)
@@ -88,8 +90,9 @@ describe('Integration: Multi-Turn CLI Flow', () => {
     console.log('\n🔄 INTEGRATION TEST: responseId in Return Value')
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
-    const adapter = ModelAdapterFactory.createAdapter(GPT5_CODEX_PROFILE)
-    const shouldUseResponses = ModelAdapterFactory.shouldUseResponsesAPI(GPT5_CODEX_PROFILE)
+    const gpt5Profile = getGPT5Profile()
+    const adapter = ModelAdapterFactory.createAdapter(gpt5Profile)
+    const shouldUseResponses = ModelAdapterFactory.shouldUseResponsesAPI(gpt5Profile)
 
     if (!shouldUseResponses) {
       console.log('  ⚠️  Skipping: Model does not support Responses API')
@@ -107,7 +110,7 @@ describe('Integration: Multi-Turn CLI Flow', () => {
     })
 
     const { callGPT5ResponsesAPI } = await import('../../services/openai')
-    const response = await callGPT5ResponsesAPI(GPT5_CODEX_PROFILE, request)
+    const response = await callGPT5ResponsesAPI(gpt5Profile, request)
     const unifiedResponse = await adapter.parseResponse(response)
 
     // Convert to AssistantMessage (like refactored claude.ts)

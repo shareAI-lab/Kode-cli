@@ -1950,12 +1950,34 @@ async function queryOpenAI(
             response,
           )
 
+          // Convert UnifiedResponse.toolCalls to tool_use content blocks
+          const contentBlocks = [...(unifiedResponse.content || [])]
+
+          if (unifiedResponse.toolCalls && unifiedResponse.toolCalls.length > 0) {
+            for (const toolCall of unifiedResponse.toolCalls) {
+              const tool = toolCall.function
+              const toolName = tool?.name
+              let toolArgs = {}
+              try {
+                toolArgs = tool?.arguments ? JSON.parse(tool.arguments) : {}
+              } catch (e) {
+                // Invalid JSON in tool arguments
+              }
+
+              contentBlocks.push({
+                type: 'tool_use',
+                input: toolArgs,
+                name: toolName,
+                id: toolCall.id?.length > 0 ? toolCall.id : nanoid(),
+              })
+            }
+          }
+
           const assistantMsg: AssistantMessage = {
             type: 'assistant',
             message: {
               role: 'assistant',
-              content: unifiedResponse.content,
-              tool_calls: unifiedResponse.toolCalls,
+              content: contentBlocks,
               usage: {
                 input_tokens: unifiedResponse.usage.promptTokens ?? 0,
                 output_tokens: unifiedResponse.usage.completionTokens ?? 0,

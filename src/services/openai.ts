@@ -1082,43 +1082,8 @@ async function getGPT5CompletionWithProfile(
   const isOfficialOpenAI = !modelProfile.baseURL || 
     modelProfile.baseURL.includes('api.openai.com')
 
-  // 🚀 Try Responses API for official OpenAI non-streaming requests
-  if (features.supportsResponsesAPI && !opts.stream && isOfficialOpenAI) {
-    try {
-      debugLogger.api('ATTEMPTING_GPT5_RESPONSES_API', {
-        model: opts.model,
-        baseURL: modelProfile.baseURL || 'official',
-        provider: modelProfile.provider,
-        stream: opts.stream,
-        requestId: getCurrentRequest()?.id,
-      })
-      
-      const result = await callGPT5ResponsesAPI(modelProfile, opts, signal)
-      
-      debugLogger.api('GPT5_RESPONSES_API_SUCCESS', {
-        model: opts.model,
-        baseURL: modelProfile.baseURL || 'official',
-        requestId: getCurrentRequest()?.id,
-      })
-      
-      return result
-    } catch (error) {
-      debugLogger.api('GPT5_RESPONSES_API_FALLBACK', {
-        model: opts.model,
-        error: error.message,
-        baseURL: modelProfile.baseURL || 'official',
-        requestId: getCurrentRequest()?.id,
-      })
-      
-      console.warn(
-        `🔄 GPT-5 Responses API failed, falling back to Chat Completions: ${error.message}`
-      )
-      // Fall through to Chat Completions API
-    }
-  } 
-  
   // 🌐 Handle third-party GPT-5 providers with enhanced compatibility
-  else if (!isOfficialOpenAI) {
+  if (!isOfficialOpenAI) {
     debugLogger.api('GPT5_THIRD_PARTY_PROVIDER', {
       model: opts.model,
       baseURL: modelProfile.baseURL,

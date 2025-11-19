@@ -19,6 +19,7 @@ import { test, expect, describe } from 'bun:test'
 import { ModelAdapterFactory } from '../../services/modelAdapterFactory'
 import { ModelProfile } from '../../utils/config'
 import { callGPT5ResponsesAPI } from '../../services/openai'
+import { productionTestModels, getChatCompletionsModels, getResponsesAPIModels } from '../testAdapters'
 
 // Load environment variables from .env file for integration tests
 if (process.env.NODE_ENV !== 'production') {
@@ -43,37 +44,65 @@ if (process.env.NODE_ENV !== 'production') {
   }
 }
 
-// Test profiles for different models
-const GPT5_CODEX_PROFILE: ModelProfile = {
-  name: 'gpt-5-codex',
-  provider: 'openai',
-  modelName: 'gpt-5-codex',
-  baseURL: process.env.TEST_GPT5_BASE_URL || 'http://127.0.0.1:3000/openai',
-  apiKey: process.env.TEST_GPT5_API_KEY || '',
-  maxTokens: 8192,
-  contextLength: 128000,
-  reasoningEffort: 'high',
-  isActive: true,
-  createdAt: Date.now(),
-}
-
-const MINIMAX_CODEX_PROFILE: ModelProfile = {
-  name: 'minimax codex-MiniMax-M2',
-  provider: 'minimax',
-  modelName: 'codex-MiniMax-M2',
-  baseURL: process.env.TEST_CHAT_COMPLETIONS_BASE_URL || 'https://api.minimaxi.com/v1',
-  apiKey: process.env.TEST_CHAT_COMPLETIONS_API_KEY || '',
-  maxTokens: 8192,
-  contextLength: 128000,
-  reasoningEffort: null,
-  createdAt: Date.now(),
-  isActive: true,
-}
+// Use only production models from testAdapters - these require API keys
+const ACTIVE_PRODUCTION_MODELS = productionTestModels.filter(model => model.isActive)
+const CHAT_COMPLETIONS_MODELS = getChatCompletionsModels(ACTIVE_PRODUCTION_MODELS)
+const RESPONSES_API_MODELS = getResponsesAPIModels(ACTIVE_PRODUCTION_MODELS)
 
 // Switch between models using TEST_MODEL env var
-// Options: 'gpt5' (default) or 'minimax'
+// Only uses models from testAdapters - no fallback profiles
 const TEST_MODEL = process.env.TEST_MODEL || 'gpt5'
-const ACTIVE_PROFILE = TEST_MODEL === 'minimax' ? MINIMAX_CODEX_PROFILE : GPT5_CODEX_PROFILE
+
+// Model selection - only uses active production models from testAdapters by adapter type
+function getActiveProfile(): ModelProfile {
+  if (ACTIVE_PRODUCTION_MODELS.length === 0) {
+    throw new Error(
+      `No active production models found in testAdapters. Please set environment variables:\n` +
+      `TEST_GPT5_API_KEY, TEST_MINIMAX_API_KEY, TEST_DEEPSEEK_API_KEY, TEST_CLAUDE_API_KEY, or TEST_GLM_API_KEY`
+    )
+  }
+
+  // For 'gpt5' or when no specific model specified, use first Responses API model
+  if (TEST_MODEL === 'gpt5' || !TEST_MODEL || TEST_MODEL === '') {
+    if (RESPONSES_API_MODELS.length === 0) {
+      throw new Error(
+        `No active Responses API production models found. Available active models: ${ACTIVE_PRODUCTION_MODELS
+          .map(m => `${m.name} (${m.modelName})`)
+          .join(', ')}`
+      )
+    }
+    return RESPONSES_API_MODELS[0]
+  }
+
+  // For 'minimax', use first Chat Completions model
+  if (TEST_MODEL === 'minimax') {
+    if (CHAT_COMPLETIONS_MODELS.length === 0) {
+      throw new Error(
+        `No active Chat Completions production models found. Available active models: ${ACTIVE_PRODUCTION_MODELS
+          .map(m => `${m.name} (${m.modelName})`)
+          .join(', ')}`
+      )
+    }
+    return CHAT_COMPLETIONS_MODELS[0]
+  }
+
+  // For specific model names, try to find exact match in active models
+  const foundModel = ACTIVE_PRODUCTION_MODELS.find(m =>
+    m.modelName === TEST_MODEL || m.name.toLowerCase().includes(TEST_MODEL.toLowerCase())
+  )
+
+  if (!foundModel) {
+    throw new Error(
+      `Model '${TEST_MODEL}' not found in active production models. Available models: ${ACTIVE_PRODUCTION_MODELS
+        .map(m => `${m.name} (${m.modelName})`)
+        .join(', ')}`
+    )
+  }
+
+  return foundModel
+}
+
+const ACTIVE_PROFILE = getActiveProfile()
 
 describe('🔌 Integration: Full Claude.ts Flow (Model-Agnostic)', () => {
   test('✅ End-to-end flow through claude.ts path', async () => {
@@ -233,7 +262,7 @@ describe('🔌 Integration: Full Claude.ts Flow (Model-Agnostic)', () => {
         setTimeout(() => reject(new Error('Test timeout after 5 seconds')), 5000)
       })
 
-      const responsePromise = callGPT5ResponsesAPI(GPT5_CODEX_PROFILE, request)
+      const responsePromise = callGPT5ResponsesAPI(ACTIVE_PROFILE, request)
       const response = await Promise.race([responsePromise, timeoutPromise]) as any
 
       console.log('\n📡 Response received:', response.status)
@@ -359,7 +388,7 @@ describe('🔌 Integration: Full Claude.ts Flow (Model-Agnostic)', () => {
         setTimeout(() => reject(new Error('Test timeout after 5 seconds')), 5000)
       })
 
-      const responsePromise = callGPT5ResponsesAPI(GPT5_CODEX_PROFILE, request)
+      const responsePromise = callGPT5ResponsesAPI(ACTIVE_PROFILE, request)
       const response = await Promise.race([responsePromise, timeoutPromise]) as any
 
       console.log('\n📡 Response received:', response.status)

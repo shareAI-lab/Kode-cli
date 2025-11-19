@@ -1,63 +1,132 @@
 # OpenAI Adapter Layer
 
-This module explains how Kode’s Anthropic-first conversation engine can selectively route requests through OpenAI Chat Completions or the new Responses API without exposing that complexity to the rest of the system. The adapter layer only runs when `USE_NEW_ADAPTERS !== 'false'` and a `ModelProfile` is available.
+This module enables Kode's Anthropic-first conversation engine to seamlessly interact with OpenAI-compatible providers. It selectively routes requests through either the standard Chat Completions API or the new Responses API without exposing provider complexity to the rest of the system.
 
-## Goals
+The adapter layer activates when `USE_NEW_ADAPTERS !== 'false'` and a valid `ModelProfile` is configured.
 
-- Preserve Anthropic-native data structures (`AssistantMessage`, `MessageParam`, tool blocks) everywhere outside the adapter layer.
-- Translate those structures into a provider-neutral `UnifiedRequestParams` shape so different adapters can share logic.
-- Map the unified format onto each provider’s transport (Chat Completions vs Responses API) and back into Anthropic-style `AssistantMessage` objects.
+## Architecture
+
+The adapter layer acts as a translation bridge, preserving Anthropic data structures internally while communicating with various external providers.
+
+```mermaid
+graph TD
+    A[Anthropic Messages] -->|queryOpenAI| B(UnifiedRequestParams)
+    B --> C{Adapter Selection}
+    C -->|Standard| D[ChatCompletionsAdapter]
+    C -->|Native Responses| E[ResponsesAPIAdapter]
+    D --> F[OpenAI API /chat/completions]
+    E --> G[OpenAI API /responses]
+    F --> H(UnifiedResponse)
+    G --> H
+    H -->|Normalization| I[Anthropic AssistantMessage]
+```
+
+## Core Concepts
+
+### Unified Data Structures
+
+To maintain provider neutrality, the system uses intermediate data structures defined in [`src/types/modelCapabilities.ts`](file:///Users/ruonan/repo/kode/Kode-cli/src/types/modelCapabilities.ts).
+
+#### UnifiedRequestParams
+```typescript
+interface UnifiedRequestParams {
+  messages: any[]           // OpenAI-format messages
+  systemPrompt: string[]    // Preserved system prompts
+  tools: Tool[]             // Abstract tool definitions
+  maxTokens: number
+  stream: boolean
+  reasoningEffort?: string  // 'low' | 'medium' | 'high'
+  verbosity?: string        // 'concise' | 'verbose'
+  previousResponseId?: string
+}
+```
+
+#### UnifiedResponse
+```typescript
+interface UnifiedResponse {
+  id: string
+  content: any[]            // Normalized content blocks
+  toolCalls: any[]          // Normalized tool calls
+  usage: {
+    promptTokens: number
+    completionTokens: number
+    reasoningTokens?: number
+  }
+  responseId?: string       // For stateful follow-ups
+}
+```
 
 ## Request Flow
 
-1. **Anthropic Messages → Unified Params**  
-   `queryOpenAI` (`src/services/claude.ts`) converts the existing Anthropic message history into OpenAI-style role/content pairs via `convertAnthropicMessagesToOpenAIMessages`, flattens system prompts, and builds a `UnifiedRequestParams` bundle (see `src/types/modelCapabilities.ts`). This bundle captures:
-   - `messages`: already normalized to OpenAI format but still provider-neutral inside the adapters.
-   - `systemPrompt`: array of strings, preserving multi-block Anthropic system prompts.
-   - `tools`: tool metadata (names, descriptions, JSON schema) fetched once so adapters can reshape it.
-   - `maxTokens`, `stream`, `reasoningEffort`, `verbosity`, `previousResponseId`, and `temperature` flags.
+1.  **Normalization (`src/services/claude.ts`)**
+    *   Converts Anthropic message history to OpenAI format.
+    *   Flattens system prompts while preserving structure.
+    *   Builds the `UnifiedRequestParams` bundle.
 
-2. **Adapter Selection**  
-   `ModelAdapterFactory` inspects the `ModelProfile` and capability table (`src/constants/modelCapabilities.ts`) to choose either:
-   - `ChatCompletionsAdapter` for classic `/chat/completions` style providers.
-   - `ResponsesAPIAdapter` when the provider natively supports `/responses`.
+2.  **Adapter Selection (`ModelAdapterFactory`)**
+    *   Inspects `ModelProfile` and capabilities.
+    *   Selects `ChatCompletionsAdapter` for standard providers.
+    *   Selects `ResponsesAPIAdapter` for providers supporting the new Responses API.
 
-3. **Adapter-Specific Request Construction**
-   - **Chat Completions (`src/services/adapters/chatCompletions.ts`)**
-     - Reassembles a single message list including system prompts.
-     - Picks the correct max-token field (`max_tokens` vs `max_completion_tokens`).
-     - Attaches OpenAI function-calling tool descriptors, optional `stream_options`, reasoning effort, and verbosity when supported.
-     - Handles model quirks (e.g., removes unsupported fields for `o1` models).
-   - **Responses API (`src/services/adapters/responsesAPI.ts`)**
-     - Converts chat-style messages into `input` items (message blocks, function-call outputs, images).
-     - Moves system prompts into the `instructions` string.
-     - Uses `max_output_tokens`, always enables streaming, and adds `include` entries for reasoning envelopes.
-     - Emits the flat `tools` array expected by `/responses`, `tool_choice`, `parallel_tool_calls`, state IDs, verbosity controls, etc.
+3.  **Request Construction**
 
-4. **Transport**  
-   Both adapters delegate the actual network call to helpers in `src/services/openai.ts`:
-   - Chat Completions requests use `getCompletionWithProfile` (legacy path) or the same helper `queryOpenAI` previously relied on.
-   - Responses API requests go through `callGPT5ResponsesAPI`, which POSTs the adapter-built payload and returns the raw `Response` object for streaming support.
+    | Feature | Chat Completions Adapter | Responses API Adapter |
+    | :--- | :--- | :--- |
+    | **Endpoint** | `/chat/completions` | `/responses` |
+    | **Message Format** | Single list with system messages | `input` array with typed items |
+    | **Tools** | `tools` array (JSON Schema) | Flat `tools` list |
+    | **Streaming** | Optional `stream: true` | Always enabled |
+    | **Reasoning** | `reasoning_effort` param | `include: ['reasoning.encrypted_content']` |
 
 ## Response Flow
 
-1. **Raw Response → Unified Response**
-   - `ChatCompletionsAdapter.parseResponse` pulls the first `choice`, extracts tool calls, and normalizes usage counts.
-   - `ResponsesAPIAdapter.parseResponse` distinguishes between streaming vs JSON responses:
-     - Streaming: incrementally decode SSE chunks, concatenate `response.output_text.delta`, and capture completed tool calls.
-     - JSON: fold `output` message items into text blocks, gather tool-call items, and preserve `usage`/`response.id` for stateful follow-ups.
-   - Both return a `UnifiedResponse` containing `content`, `toolCalls`, token usage, and optional `responseId`.
+Both adapters normalize provider-specific responses into the `UnifiedResponse` format.
 
-2. **Unified Response → Anthropic AssistantMessage**  
-   Back in `queryOpenAI`, the unified response is wrapped in Anthropic’s schema: `content` becomes Ink-ready blocks, tool calls become `tool_use` entries, and usage numbers flow into `AssistantMessage.message.usage`. Consumers (UI, TaskTool, etc.) continue to see only Anthropic-style messages.
+### Chat Completions
+*   Extracts content from `choices[0].message`.
+*   Normalizes standard usage statistics.
+*   Handles standard function calling format.
 
-## Legacy Fallbacks
+### Responses API
+*   **Streaming**: Incrementally decodes SSE chunks.
+*   **JSON**: Folds `output` message items into text blocks.
+*   **State**: Captures `response.id` for stateful conversational continuity.
 
-- If `USE_NEW_ADAPTERS === 'false'` or no `ModelProfile` is available, the system bypasses adapters entirely and hits `getCompletionWithProfile` / `getGPT5CompletionWithProfile`. These paths still rely on helper utilities in `src/services/openai.ts`.
-- `ResponsesAPIAdapter` also carries compatibility flags (e.g., `previousResponseId`, `parallel_tool_calls`) so a single unified params structure works across official OpenAI and third-party providers.
+## Extension Guide
 
-## When to Extend This Layer
+### Adding a New Provider
+If a new provider follows standard OpenAI conventions, simply add a new `ModelProfile`. If it requires custom handling:
 
-- **New OpenAI-style providers**: add capability metadata and, if necessary, a specialized adapter that extends `ModelAPIAdapter`.
-- **Model-specific quirks**: keep conversions inside the adapter so upstream Anthropic abstractions stay untouched.
-- **Stateful Responses**: leverage the `responseId` surfaced by `UnifiedResponse` to support follow-up calls that require `previous_response_id`.
+1.  Define capabilities in [`src/constants/modelCapabilities.ts`](file:///Users/ruonan/repo/kode/Kode-cli/src/constants/modelCapabilities.ts).
+2.  Extend `ModelAPIAdapter` if the protocol is significantly different.
+3.  Register the new adapter in `ModelAdapterFactory`.
+
+### Handling Model Quirks
+Keep model-specific logic (like `o1` unsupported fields) inside the specific adapter's `createRequest` method. This keeps the core logic clean and provider-agnostic.
+
+## Non-Obvious Design Patterns
+
+### 1. Adapter Pattern for API Compatibility
+- **What it looks like**: Code duplication across adapters (e.g., `chatCompletions.ts` vs `responsesAPI.ts`).
+- **Why it's intentional**: Responses API and Chat Completions are fundamentally different protocols. Separate adapters provide clarity, type safety, and independent evolution at the cost of some duplication.
+- **When to use**: When supporting multiple versions/formats of an API where a single abstraction would be leaky or overly complex.
+
+### 2. Multi-Model Architecture
+- **What it looks like**: Complex model management with profiles and pointers (`ModelManager`).
+- **Why it's intentional**: Different models excel at different tasks (reasoning vs coding vs speed). This allows optimal model selection for each job.
+- **When to use**: When you need to leverage the specific strengths of multiple AI models within a single workflow.
+
+## Maintenance Tips
+
+### Adding a New Model
+1.  Add capability definition in `src/constants/modelCapabilities.ts`.
+2.  Add to `MODEL_CAPABILITIES_REGISTRY`.
+3.  Add default profile in `src/constants/models.ts`.
+4.  Test with integration test (`src/test/integration/integration-cli-flow.test.ts`).
+
+### Modifying Responses API Request
+-   Edit `src/services/adapters/responsesAPI.ts`.
+-   Run unit tests: `bun test src/test/unit/responses-api-e2e.test.ts`.
+-   Run integration test: `bun test src/test/integration/integration-cli-flow.test.ts`.
+-   Run production test: `PRODUCTION_TEST_MODE=true bun test src/test/unit/responses-api-e2e.test.ts`.
+

@@ -10,6 +10,7 @@ This comprehensive documentation provides a complete understanding of the Kode c
 - **[Architecture](./architecture.md)** - High-level system architecture, component relationships, and data flow
 - **[Security Model](./security-model.md)** - Comprehensive security architecture, permission system, and threat model
 - **[Configuration System](./configuration.md)** - Multi-level configuration management and settings
+- **[Testing](./testing.md)** - Comprehensive testing guide and infrastructure
 
 ### System Components
 

@@ -280,6 +280,25 @@ function selectFallbackStrategy(error: Error): Strategy {
 
 ## Streaming Architecture
 
+### Kode's Three-Level Streaming Pipeline
+
+Kode implements a sophisticated async generator streaming architecture that ensures real-time responsiveness:
+
+1. **Provider Stream** (`claude.ts` / `openai.ts`)
+   - Handles raw API chunks (SSE events)
+   - Performs real-time event processing
+   - Normalizes provider-specific events into internal format
+
+2. **Query Generator** (`query.ts`)
+   - Async generator yielding `Message` events as they arrive
+   - Builds structured message objects with content blocks
+   - Tracks TTFT (Time-To-First-Token)
+
+3. **REPL Consumer** (`REPL.tsx`)
+   - Consumes query generator with `for await` loop
+   - Updates UI in real-time
+   - Supports cancellation via AbortSignal
+
 ### Event Types
 
 ```typescript

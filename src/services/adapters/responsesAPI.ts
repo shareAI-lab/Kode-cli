@@ -96,12 +96,29 @@ export class ResponsesAPIAdapter extends ModelAPIAdapter {
         }
       }
 
+      let description: string
+      if (typeof tool.description === 'function') {
+        // For async functions, we can't await in sync context
+        // Use a fallback approach - try to get cached description or use name
+        description = `Tool: ${tool.name}`
+
+        // Try to get description synchronously if possible
+        try {
+          // Some tools might have a cached description property
+          if ('cachedDescription' in tool) {
+            description = (tool as any).cachedDescription
+          }
+        } catch (error) {
+          // Keep fallback
+        }
+      } else {
+        description = tool.description || `Tool: ${tool.name}`
+      }
+
       return {
         type: 'function',
         name: tool.name,
-        description: typeof tool.description === 'function'
-          ? 'Tool with dynamic description'
-          : (tool.description || ''),
+        description,
         parameters: parameters || { type: 'object', properties: {} }
       }
     })
