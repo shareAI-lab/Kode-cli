@@ -200,7 +200,12 @@ export const FileEditTool = {
 
     const enc = detectFileEncoding(fullFilePath)
     const file = readFileSync(fullFilePath, enc)
-    if (!file.includes(old_string)) {
+    
+    // 在这里统一换行符
+    const normalizedFile = file.replace(/\r\n/g, '\n')
+    const normalizedOldString = old_string.replace(/\r\n/g, '\n')
+    
+    if (!normalizedFile.includes(normalizedOldString)) {
       return {
         result: false,
         message: `String to replace not found in file.`,
@@ -210,7 +215,7 @@ export const FileEditTool = {
       }
     }
 
-    const matches = file.split(old_string).length - 1
+    const matches = normalizedFile.split(normalizedOldString).length - 1
     if (matches > 1) {
       return {
         result: false,
