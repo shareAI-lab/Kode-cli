@@ -580,16 +580,16 @@ function PromptInput({
   const handleSpecialKey = useCallback((inputChar: string, key: any): boolean => {
     if (isEditingExternally) return true
 
-    // Ctrl+M switches model
-    if (key.ctrl && (inputChar === 'm' || inputChar === 'M')) {
+    // Option+M switches model
+    if (key.option && (inputChar === 'm' || inputChar === 'M')) {
       handleQuickModelSwitch()
       return true
     }
 
-    // Note: Shift/Meta/Option + Enter is now handled in useTextInput
+    // Note: Option + Enter is now handled in useTextInput
 
-    // Ctrl+G -> open external editor
-    if (key.ctrl && (inputChar === 'g' || inputChar === 'G')) {
+    // Option+G -> open external editor
+    if (key.option && (inputChar === 'g' || inputChar === 'G')) {
       void handleExternalEdit()
       return true
     }
@@ -693,52 +693,57 @@ function PromptInput({
       </Box>
       {!completionActive && suggestions.length === 0 && (
         <Box
-          flexDirection="row"
-          justifyContent="space-between"
+          flexDirection="column"
           paddingX={2}
           paddingY={0}
         >
-          <Box justifyContent="flex-start" gap={1}>
-            {exitMessage.show ? (
-              <Text dimColor>Press {exitMessage.key} again to exit</Text>
-            ) : message.show ? (
-              <Text dimColor>{message.text}</Text>
-            ) : modelSwitchMessage.show ? (
-              <Text color={theme.success}>{modelSwitchMessage.text}</Text>
-            ) : (
-              <>
-                <Text
-                  color={mode === 'bash' ? theme.bashBorder : undefined}
-                  dimColor={mode !== 'bash'}
-                >
-                  ! for bash mode
-                </Text>
-              <Text
-                color={mode === 'koding' ? theme.noting : undefined}
-                dimColor={mode !== 'koding'}
-              >
-                · # for AGENTS.md
-              </Text>
-              <Text dimColor>
-                  · / for commands · ctrl+m to switch model · ctrl+g edit in editor · shift+⏎ for newline · esc to undo
-              </Text>
-            </>
-          )}
-        </Box>
-          <SentryErrorBoundary children={
-            <Box justifyContent="flex-end" gap={1}>
-              {!debug &&
-                tokenUsage < WARNING_THRESHOLD && (
-                  <Text dimColor>
-                    {terminalSetup.isEnabled &&
-                    isShiftEnterKeyBindingInstalled()
-                      ? 'shift + ⏎ for newline'
-                      : '\\⏎ for newline'}
+          {/* First line: Command indicators */}
+          <Box flexDirection="row" justifyContent="space-between">
+            <Box justifyContent="flex-start" gap={1}>
+              {exitMessage.show ? (
+                <Text dimColor>Press {exitMessage.key} again to exit</Text>
+              ) : message.show ? (
+                <Text dimColor>{message.text}</Text>
+              ) : modelSwitchMessage.show ? (
+                <Text color={theme.success}>{modelSwitchMessage.text}</Text>
+              ) : (
+                <>
+                  <Text dimColor>/ for commands</Text>
+                  <Text
+                    color={mode === 'bash' ? theme.bashBorder : undefined}
+                    dimColor={mode !== 'bash'}
+                  >
+                    · ! run some shell command
                   </Text>
-                )}
-              <TokenWarning tokenUsage={tokenUsage} />
+                  <Text
+                    color={mode === 'koding' ? theme.noting : undefined}
+                    dimColor={mode !== 'koding'}
+                  >
+                    · # tell agent something to remember forever
+                  </Text>
+                </>
+              )}
             </Box>
-          } />
+            <Box justifyContent="flex-end">
+              <Text dimColor>ESC for undo</Text>
+            </Box>
+          </Box>
+
+          {/* Second line: Shortcuts */}
+          {!exitMessage.show && !message.show && !modelSwitchMessage.show && (
+            <Box flexDirection="row" justifyContent="space-between">
+              <Box justifyContent="flex-start" gap={1}>
+                <Text dimColor>
+                  option+m to switch model · option+g edit in editor · option+⏎ for newline
+                </Text>
+              </Box>
+              <SentryErrorBoundary children={
+                <Box justifyContent="flex-end" gap={1}>
+                  <TokenWarning tokenUsage={tokenUsage} />
+                </Box>
+              } />
+            </Box>
+          )}
         </Box>
       )}
       {/* Unified completion suggestions - optimized rendering */}

@@ -195,8 +195,8 @@ export function useTextInput({
     ) {
       return cursor.backspace().insert('\n')
     }
-    // Support Shift+Enter, Meta+Enter, and Option+Enter for newline
-    if (key.shift || key.meta || ('option' in key && key.option)) {
+    // Support Option+Enter for newline
+    if ('option' in key && key.option) {
       return cursor.insert('\n')
     }
     onSubmit?.(originalValue)
