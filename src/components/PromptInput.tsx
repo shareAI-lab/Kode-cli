@@ -708,13 +708,13 @@ function PromptInput({
                 <Text color={theme.success}>{modelSwitchMessage.text}</Text>
               ) : (
                 <>
-                  <Text dimColor>/ for commands</Text>
                   <Text
                     color={mode === 'bash' ? theme.bashBorder : undefined}
                     dimColor={mode !== 'bash'}
                   >
-                    · ! run some shell command
+                    ! run some shell command
                   </Text>
+                  <Text dimColor>· / for commands</Text>
                   <Text
                     color={mode === 'koding' ? theme.noting : undefined}
                     dimColor={mode !== 'koding'}
@@ -725,7 +725,7 @@ function PromptInput({
               )}
             </Box>
             <Box justifyContent="flex-end">
-              <Text dimColor>ESC for undo</Text>
+              <Text dimColor>ESC to interrupt · 2×ESC to undo</Text>
             </Box>
           </Box>
 
@@ -734,7 +734,7 @@ function PromptInput({
             <Box flexDirection="row" justifyContent="space-between">
               <Box justifyContent="flex-start" gap={1}>
                 <Text dimColor>
-                  option+m to switch model · option+g edit in editor · option+⏎ for newline
+                  option+m to switch model · option+g edit prompt with system editor · option+enter for newline
                 </Text>
               </Box>
               <SentryErrorBoundary children={
