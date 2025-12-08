@@ -725,7 +725,7 @@ function PromptInput({
               )}
             </Box>
             <Box justifyContent="flex-end">
-              <Text dimColor>ESC to interrupt · 2×ESC to undo</Text>
+              <Text dimColor>ESC to interrupt · 2×ESC for undo</Text>
             </Box>
           </Box>
 
