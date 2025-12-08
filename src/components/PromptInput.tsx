@@ -646,9 +646,9 @@ function PromptInput({
             ? theme.bashBorder
             : mode === 'koding'
               ? theme.noting
-              : theme.secondaryBorder
+              : theme.inputBorder
         }
-        borderDimColor
+        borderDimColor={false}
         borderStyle="classic"
         marginTop={1}
         width="100%"

@@ -6,6 +6,7 @@ export interface Theme {
   noting: string
   permission: string
   secondaryBorder: string
+  inputBorder: string
   text: string
   secondaryText: string
   suggestion: string
@@ -28,6 +29,7 @@ const lightTheme: Theme = {
   noting: '#222222',
   permission: '#e9c61aff',
   secondaryBorder: '#999',
+  inputBorder: '#a5b4fc',
   text: '#000',
   secondaryText: '#666',
   suggestion: '#32e98aff',
@@ -50,6 +52,7 @@ const lightDaltonizedTheme: Theme = {
   noting: '#222222',
   permission: '#3366ff',
   secondaryBorder: '#999',
+  inputBorder: '#93a5f5',
   text: '#000',
   secondaryText: '#666',
   suggestion: '#3366ff',
@@ -72,6 +75,7 @@ const darkTheme: Theme = {
   noting: '#222222',
   permission: '#b1b9f9',
   secondaryBorder: '#888',
+  inputBorder: '#818cf8',
   text: '#fff',
   secondaryText: '#999',
   suggestion: '#b1b9f9',
@@ -94,6 +98,7 @@ const darkDaltonizedTheme: Theme = {
   noting: '#222222',
   permission: '#99ccff',
   secondaryBorder: '#888',
+  inputBorder: '#7c8ff5',
   text: '#fff',
   secondaryText: '#999',
   suggestion: '#99ccff',
