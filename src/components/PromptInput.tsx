@@ -637,6 +637,10 @@ function PromptInput({
       <Box
         alignItems="flex-start"
         justifyContent="flex-start"
+        borderTop={true}
+        borderBottom={true}
+        borderLeft={false}
+        borderRight={false}
         borderColor={
           mode === 'bash'
             ? theme.bashBorder
@@ -645,7 +649,7 @@ function PromptInput({
               : theme.secondaryBorder
         }
         borderDimColor
-        borderStyle="round"
+        borderStyle="classic"
         marginTop={1}
         width="100%"
       >
