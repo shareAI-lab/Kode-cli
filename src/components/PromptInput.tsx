@@ -580,20 +580,13 @@ function PromptInput({
   const handleSpecialKey = useCallback((inputChar: string, key: any): boolean => {
     if (isEditingExternally) return true
 
-    // Ctrl+M switches model (preferred), also allow Option/Alt+M and µ on macOS
-    if (
-      (key.ctrl && (key.return || inputChar === 'm' || inputChar === 'M')) ||
-      ((key.option || key.meta) && (inputChar === 'm' || inputChar === 'M' || inputChar === 'µ'))
-    ) {
+    // Ctrl+M switches model
+    if (key.ctrl && (inputChar === 'm' || inputChar === 'M')) {
       handleQuickModelSwitch()
       return true
     }
 
-    // Shift/Meta/Option + Enter => insert newline, do not submit
-    if (key.return && (key.shift || key.meta || key.option)) {
-      insertNewlineAtCursor()
-      return true
-    }
+    // Note: Shift/Meta/Option + Enter is now handled in useTextInput
 
     // Ctrl+G -> open external editor
     if (key.ctrl && (inputChar === 'g' || inputChar === 'G')) {
@@ -727,7 +720,7 @@ function PromptInput({
                 · # for AGENTS.md
               </Text>
               <Text dimColor>
-                  · / for commands · ctrl+m (or option+m) to switch model · ctrl+g edit in editor · shift+⏎ for newline · esc to undo
+                  · / for commands · ctrl+m to switch model · ctrl+g edit in editor · shift+⏎ for newline · esc to undo
               </Text>
             </>
           )}
