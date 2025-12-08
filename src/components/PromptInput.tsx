@@ -493,6 +493,23 @@ function PromptInput({
     setPastedText(text)
   }
 
+  // Global keyboard shortcut handler for Option+M and Option+G
+  useInput((inputChar, key) => {
+    if (isEditingExternally || isLoading) return
+
+    // Option+M (Alt+M) switches model
+    if (inputChar === 'µ' || (key.meta && inputChar === 'm')) {
+      handleQuickModelSwitch()
+      return
+    }
+
+    // Option+G (Alt+G) opens external editor
+    if (inputChar === '©' || (key.meta && inputChar === 'g')) {
+      void handleExternalEdit()
+      return
+    }
+  }, { isActive: !isEditingExternally && !isLoading })
+
   useInput((inputChar, key) => {
     // For bash mode, only exit when deleting the last character (which would be the '!' character)
     if (mode === 'bash' && (key.backspace || key.delete)) {
@@ -580,16 +597,18 @@ function PromptInput({
   const handleSpecialKey = useCallback((inputChar: string, key: any): boolean => {
     if (isEditingExternally) return true
 
-    // Option+M switches model
-    if (key.option && (inputChar === 'm' || inputChar === 'M')) {
+    // Option+M (Alt+M) switches model - check both option and meta keys
+    // Also check for µ character which is produced by Option+M on macOS
+    if ((key.option || key.meta) && (inputChar === 'm' || inputChar === 'M' || inputChar === 'µ')) {
       handleQuickModelSwitch()
       return true
     }
 
     // Note: Option + Enter is now handled in useTextInput
 
-    // Option+G -> open external editor
-    if (key.option && (inputChar === 'g' || inputChar === 'G')) {
+    // Option+G (Alt+G) -> open external editor
+    // Also check for © character which might be produced by Option+G on macOS
+    if ((key.option || key.meta) && (inputChar === 'g' || inputChar === 'G' || inputChar === '©')) {
       void handleExternalEdit()
       return true
     }
@@ -666,7 +685,7 @@ function PromptInput({
             <Text color={theme.noting}>&nbsp;#&nbsp;</Text>
           ) : (
             <Text color={isLoading ? theme.secondaryText : undefined}>
-              &nbsp;&gt;&nbsp;
+              K&gt;&nbsp;
             </Text>
           )}
         </Box>
