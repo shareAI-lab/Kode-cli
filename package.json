@@ -48,6 +48,7 @@
     "@anthropic-ai/bedrock-sdk": "^0.12.6",
     "@anthropic-ai/sdk": "^0.39.0",
     "@anthropic-ai/vertex-sdk": "^0.7.0",
+    "@aws-sdk/client-bedrock-runtime": "3.797.0",
     "@commander-js/extra-typings": "^13.1.0",
     "@inkjs/ui": "^2.0.0",
     "@modelcontextprotocol/sdk": "^1.15.1",
@@ -66,7 +67,7 @@
     "glob": "^11.0.3",
     "gray-matter": "^4.0.3",
     "highlight.js": "^11.11.1",
-    "ink": "^5.2.1",
+    "ink": "5.2.1",
     "ink-link": "^4.1.0",
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
@@ -98,5 +99,9 @@
     "esbuild": "^0.25.9",
     "prettier": "^3.6.2",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "@aws-sdk/client-bedrock-runtime": "3.797.0",
+    "@smithy/smithy-client": "2.5.1"
   }
 }
