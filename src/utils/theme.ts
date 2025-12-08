@@ -4,6 +4,7 @@ export interface Theme {
   bashBorder: string
   kode: string
   noting: string
+  notingBorder: string
   permission: string
   secondaryBorder: string
   inputBorder: string
@@ -27,6 +28,7 @@ const lightTheme: Theme = {
   bashBorder: '#FF6E57',
   kode: '#FFC233',
   noting: '#222222',
+  notingBorder: '#10b981',
   permission: '#e9c61aff',
   secondaryBorder: '#999',
   inputBorder: '#a5b4fc',
@@ -50,6 +52,7 @@ const lightDaltonizedTheme: Theme = {
   bashBorder: '#FF6E57',
   kode: '#FFC233',
   noting: '#222222',
+  notingBorder: '#059669',
   permission: '#3366ff',
   secondaryBorder: '#999',
   inputBorder: '#93a5f5',
@@ -73,6 +76,7 @@ const darkTheme: Theme = {
   bashBorder: '#FF6E57',
   kode: '#FFC233',
   noting: '#222222',
+  notingBorder: '#34d399',
   permission: '#b1b9f9',
   secondaryBorder: '#888',
   inputBorder: '#818cf8',
@@ -96,6 +100,7 @@ const darkDaltonizedTheme: Theme = {
   bashBorder: '#FF6E57',
   kode: '#FFC233',
   noting: '#222222',
+  notingBorder: '#10b981',
   permission: '#99ccff',
   secondaryBorder: '#888',
   inputBorder: '#7c8ff5',

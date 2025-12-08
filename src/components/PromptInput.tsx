@@ -143,6 +143,7 @@ function PromptInput({
   const [cursorOffset, setCursorOffset] = useState<number>(input.length)
   const [pastedText, setPastedText] = useState<string | null>(null)
   const [isEditingExternally, setIsEditingExternally] = useState(false)
+  const [currentPwd, setCurrentPwd] = useState<string>(process.cwd())
 
   // Permission context for mode management
   const { cycleMode, currentMode } = usePermissionContext()
@@ -419,14 +420,17 @@ function PromptInput({
       } // otherwise, ignore the pastedText if the user has modified the prompt
     }
     onInputChange('')
-    onModeChange('prompt')
+    // Keep bash mode if we're in bash mode, otherwise switch to prompt
+    if (mode !== 'bash') {
+      onModeChange('prompt')
+    }
     // Suggestions are now handled by unified completion
     setPastedImage(null)
     setPastedText(null)
     onSubmitCountChange(_ => _ + 1)
 
     setIsLoading(true)
-    
+
     const newAbortController = new AbortController()
     setAbortController(newAbortController)
 
@@ -452,7 +456,15 @@ function PromptInput({
     )
 
     if (messages.length) {
-      onQuery(messages, newAbortController)
+      // After executing a bash command, update the PWD
+      if (mode === 'bash') {
+        // Schedule PWD update after command execution
+        onQuery(messages, newAbortController).then(() => {
+          setCurrentPwd(process.cwd())
+        })
+      } else {
+        onQuery(messages, newAbortController)
+      }
     } else {
       // Local JSX commands
       addToHistory(input)
@@ -570,7 +582,7 @@ function PromptInput({
       setMessage({
         show: true,
         text:
-          result.error?.message ??
+          ('error' in result && result.error?.message) ??
           'External editor unavailable. Set $EDITOR or install code/nano/vim/notepad.',
       })
       setTimeout(() => setMessage({ show: false }), 4000)
@@ -598,19 +610,19 @@ function PromptInput({
     if (isEditingExternally) return true
 
     // Option+M (Alt+M) switches model - check both option and meta keys
-    // Also check for µ character which is produced by Option+M on macOS
-    if ((key.option || key.meta) && (inputChar === 'm' || inputChar === 'M' || inputChar === 'µ')) {
+    // Block the µ character from being inserted
+    if (inputChar === 'µ' || ((key.option || key.meta) && (inputChar === 'm' || inputChar === 'M'))) {
       handleQuickModelSwitch()
-      return true
+      return true // Block character insertion
     }
 
     // Note: Option + Enter is now handled in useTextInput
 
     // Option+G (Alt+G) -> open external editor
-    // Also check for © character which might be produced by Option+G on macOS
-    if ((key.option || key.meta) && (inputChar === 'g' || inputChar === 'G' || inputChar === '©')) {
+    // Block the © character from being inserted
+    if (inputChar === '©' || ((key.option || key.meta) && (inputChar === 'g' || inputChar === 'G'))) {
       void handleExternalEdit()
-      return true
+      return true // Block character insertion
     }
 
     return false // Not handled, allow normal processing
@@ -642,14 +654,25 @@ function PromptInput({
 
   return (
     <Box flexDirection="column">
-      {/* Model info in top-right corner */}
-      {modelInfo && (
-        <Box justifyContent="flex-end" marginBottom={1}>
-          <Text dimColor>
-            [{modelInfo.provider}] {modelInfo.name}:{' '}
-            {Math.round(modelInfo.currentTokens / 1000)}k /{' '}
-            {Math.round(modelInfo.contextLength / 1000)}k
-          </Text>
+      {/* Top info bar: PWD on left (bash mode) and Model info on right */}
+      {(mode === 'bash' || modelInfo) && (
+        <Box justifyContent="space-between" marginBottom={1} flexDirection="row">
+          {/* PWD in top-left when in bash mode */}
+          {mode === 'bash' ? (
+            <Text color={theme.bashBorder}>
+              Shell PWD: {currentPwd}
+            </Text>
+          ) : (
+            <Text> </Text>
+          )}
+          {/* Model info in top-right corner */}
+          {modelInfo && (
+            <Text dimColor>
+              [{modelInfo.provider}] {modelInfo.name}:{' '}
+              {Math.round(modelInfo.currentTokens / 1000)}k /{' '}
+              {Math.round(modelInfo.contextLength / 1000)}k
+            </Text>
+          )}
         </Box>
       )}
 
@@ -664,7 +687,7 @@ function PromptInput({
           mode === 'bash'
             ? theme.bashBorder
             : mode === 'koding'
-              ? theme.noting
+              ? theme.notingBorder
               : theme.inputBorder
         }
         borderDimColor={false}
