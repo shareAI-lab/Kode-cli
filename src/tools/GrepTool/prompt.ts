@@ -1,11 +1,32 @@
-export const TOOL_NAME_FOR_PROMPT = 'GrepTool'
+export const TOOL_NAME_FOR_PROMPT = 'Grep'
 
-export const DESCRIPTION = `
-- Fast content search tool that works with any codebase size
-- Searches file contents using regular expressions
-- Supports full regex syntax (eg. "log.*Error", "function\\s+\\w+", etc.)
-- Filter files by pattern with the include parameter (eg. "*.js", "*.{ts,tsx}")
-- Returns matching file paths sorted by modification time
-- Use this tool when you need to find files containing specific patterns
-- When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the Agent tool instead
+export const DESCRIPTION = `A powerful search tool built on ripgrep
+
+  Usage:
+  - ALWAYS use Grep for search tasks. NEVER invoke \`grep\` or \`rg\` as a Bash command. The Grep tool has been optimized for correct permissions and access.
+  - Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+")
+  - Filter files with glob parameter (e.g., "*.js", "**/*.tsx") or type parameter (e.g., "js", "py", "rust")
+  - Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts
+  - Use Task tool for open-ended searches requiring multiple rounds
+  - Pattern syntax: Uses ripgrep (not grep) - literal braces need escaping (use \`interface\\{\\}\` to find \`interface{}\` in Go code)
+  - Multiline matching: By default patterns match within single lines only. For cross-line patterns like \`struct \\{[\\s\\S]*?field\`, use \`multiline: true\`
+`
+
+export const REGEX_SYNTAX_GUIDE = `
+Common regex syntax (ripgrep compatible):
+- . matches any character
+- \\d matches digits [0-9]
+- \\w matches word characters [a-zA-Z0-9_]
+- \\s matches whitespace
+- * zero or more of previous
+- + one or more of previous
+- ? zero or one of previous
+- ^ start of line
+- $ end of line
+- [abc] character class
+- [^abc] negated character class
+- (a|b) alternation
+- (?:...) non-capturing group
+- \\b word boundary
+- Escape special chars with \\: \\. \\* \\+ etc.
 `
