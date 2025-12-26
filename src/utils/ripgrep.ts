@@ -1,10 +1,17 @@
 import { findActualExecutable } from 'spawn-rx'
-import { rgPath as vsCodeRgPath } from '@vscode/ripgrep'
 import { memoize } from 'lodash-es'
+import { fileURLToPath, resolve } from 'node:url'
+import * as path from 'path'
 import { logError } from './log'
 import { execFileNoThrow } from './execFileNoThrow'
 import { execFile } from 'child_process'
 import debug from 'debug'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = resolve(
+  __filename,
+  process.env.NODE_ENV === 'test' ? '../..' : '.',
+)
 
 const d = debug('claude:ripgrep')
 
@@ -22,9 +29,21 @@ const ripgrepPath = memoize(() => {
     // path rather than just returning 'rg'
     return cmd
   } else {
-    // Use @vscode/ripgrep which auto-downloads platform-specific binary
-    d('Using @vscode/ripgrep: %s', vsCodeRgPath)
-    return vsCodeRgPath
+    // Use the one we ship in-box
+    const rgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
+    if (process.platform === 'win32') {
+      // NB: Ripgrep doesn't ship an aarch64 binary for Windows, boooooo
+      return path.resolve(rgRoot, 'x64-win32', 'rg.exe')
+    }
+
+    const ret = path.resolve(
+      rgRoot,
+      `${process.arch}-${process.platform}`,
+      'rg',
+    )
+
+    d('internal ripgrep resolved as: %s', ret)
+    return ret
   }
 })
 
