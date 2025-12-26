@@ -99,5 +99,10 @@
     "esbuild": "^0.25.9",
     "prettier": "^3.6.2",
     "typescript": "^5.9.2"
+  },
+  "overrides": {
+    "@smithy/smithy-client": "^4.10.2",
+    "@smithy/core": "^3.20.0",
+    "@smithy/middleware-serde": "^4.2.8"
   }
 }

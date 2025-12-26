@@ -8,13 +8,37 @@ import { Tool } from '@tool'
 import { MEMORY_DIR } from '@utils/env'
 import { resolveAgentId } from '@utils/agentStorage'
 import { DESCRIPTION, PROMPT } from './prompt'
+import {
+  getMemorySnapshotManager,
+  getPendingMemoriesStore,
+} from '@utils/agentTools'
 
 const inputSchema = z.strictObject({
   file_path: z
     .string()
     .optional()
     .describe('Optional path to a specific memory file to read'),
+  use_snapshot: z
+    .boolean()
+    .optional()
+    .describe('If true, use the cached memory snapshot (faster, may be slightly stale)'),
+  include_pending: z
+    .boolean()
+    .optional()
+    .describe('If true, include pending memories that have not been flushed yet'),
 })
+
+// Memory content loader function for snapshot manager
+async function loadMemoriesContent(agentId: string): Promise<string | undefined> {
+  const agentMemoryDir = join(MEMORY_DIR, 'agents', agentId)
+  const indexPath = join(agentMemoryDir, 'index.md')
+
+  if (!existsSync(indexPath)) {
+    return undefined
+  }
+
+  return readFileSync(indexPath, 'utf-8')
+}
 
 export const MemoryReadTool = {
   name: 'MemoryRead',
@@ -53,11 +77,15 @@ export const MemoryReadTool = {
     return <FallbackToolUseRejectedMessage />
   },
   renderToolResultMessage(output) {
+    const preview = output.content.length > 100
+      ? output.content.substring(0, 100) + '...'
+      : output.content
+
     return (
       <Box justifyContent="space-between" overflowX="hidden" width="100%">
         <Box flexDirection="row">
           <Text>&nbsp;&nbsp;⎿ &nbsp;</Text>
-          <Text>{output.content}</Text>
+          <Text>{preview}</Text>
         </Box>
       </Box>
     )
@@ -77,7 +105,7 @@ export const MemoryReadTool = {
     }
     return { result: true }
   },
-  async *call({ file_path }, context) {
+  async *call({ file_path, use_snapshot, include_pending }, context) {
     const agentId = resolveAgentId(context?.agentId)
     const agentMemoryDir = join(MEMORY_DIR, 'agents', agentId)
     mkdirSync(agentMemoryDir, { recursive: true })
@@ -99,6 +127,36 @@ export const MemoryReadTool = {
       return
     }
 
+    // Use snapshot if requested (faster, may be slightly stale)
+    if (use_snapshot) {
+      const snapshotManager = getMemorySnapshotManager(
+        () => loadMemoriesContent(agentId)
+      )
+      // Use agentId as conversationId since ToolUseContext doesn't have conversationId
+      const snapshot = await snapshotManager.getMemorySnapshot(agentId)
+
+      if (snapshot) {
+        let content = snapshot
+
+        // Include pending memories if requested
+        if (include_pending) {
+          const pendingStore = getPendingMemoriesStore(agentId)
+          const pendingMemories = pendingStore.listPending()
+          if (pendingMemories.length > 0) {
+            content += '\n\n--- Pending Memories ---\n'
+            content += pendingMemories.map(m => m.content).join('\n\n')
+          }
+        }
+
+        yield {
+          type: 'result',
+          data: { content },
+          resultForAssistant: this.renderResultForAssistant({ content }),
+        }
+        return
+      }
+    }
+
     // Otherwise return the index and file list for this agent
     const files = readdirSync(agentMemoryDir, { recursive: true })
       .map(f => join(agentMemoryDir, f.toString()))
@@ -110,13 +168,24 @@ export const MemoryReadTool = {
     const index = existsSync(indexPath) ? readFileSync(indexPath, 'utf-8') : ''
 
     const quotes = "'''"
-    const content = `Here are the contents of the agent memory file, \`${indexPath}\`:
+    let content = `Here are the contents of the agent memory file, \`${indexPath}\`:
 ${quotes}
 ${index}
 ${quotes}
 
 Files in the agent memory directory:
 ${files}`
+
+    // Include pending memories if requested
+    if (include_pending) {
+      const pendingStore = getPendingMemoriesStore(agentId)
+      const pendingMemories = pendingStore.listPending()
+      if (pendingMemories.length > 0) {
+        content += '\n\n--- Pending Memories ---\n'
+        content += pendingMemories.map(m => `[${new Date(m.timestamp).toISOString()}] ${m.content}`).join('\n\n')
+      }
+    }
+
     yield {
       type: 'result',
       data: { content },

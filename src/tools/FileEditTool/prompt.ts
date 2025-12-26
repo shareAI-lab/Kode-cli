@@ -1,51 +1,48 @@
 import { NotebookEditTool } from '@tools/NotebookEditTool/NotebookEditTool'
 
-export const DESCRIPTION = `This is a tool for editing files. For moving or renaming files, you should generally use the Bash tool with the 'mv' command instead. For larger edits, use the Write tool to overwrite files. For Jupyter notebooks (.ipynb files), use the ${NotebookEditTool.name} instead.
+export const DESCRIPTION = `Performs exact string replacements in files.
 
-Before using this tool:
+Usage:
+- You must use your \`Read\` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file.
+- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
+- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
+- The edit will FAIL if \`old_string\` is not unique in the file. Either provide a larger string with more surrounding context to make it unique or use \`replace_all\` to change every instance of \`old_string\`.
+- Use \`replace_all\` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.
 
-1. Use the View tool to understand the file's contents and context
+For moving or renaming files, use the Bash tool with 'mv' command. For larger edits, use the Write tool. For Jupyter notebooks (.ipynb files), use ${NotebookEditTool.name}.
 
-2. Verify the directory path is correct (only applicable when creating new files):
-   - Use the LS tool to verify the parent directory exists and is the correct location
+Parameters:
+1. file_path: Absolute path to the file (must start with /)
+2. old_string: Text to replace (must be unique in file, match exactly including whitespace)
+3. new_string: Replacement text
+4. replace_all: (optional) If true, replace all occurrences of old_string
+5. old_str_start_line_number: (optional) Start line number hint for disambiguating multiple matches
+6. old_str_end_line_number: (optional) End line number hint for disambiguating multiple matches
 
-To make a file edit, provide the following:
-1. file_path: The absolute path to the file to modify (must be absolute, not relative)
-2. old_string: The text to replace (must be unique within the file, and must match the file contents exactly, including all whitespace and indentation)
-3. new_string: The edited text to replace the old_string
+SMART MATCHING FEATURES:
+- Fuzzy matching: If exact match fails, attempts intelligent fuzzy matching when line numbers are provided
+- Line number tolerance: Tolerates minor line number drift from file modifications
+- Tab indent auto-fix: Automatically handles tab vs space indentation mismatches
 
-The tool will replace ONE occurrence of old_string with new_string in the specified file.
+REQUIREMENTS:
+1. UNIQUENESS: old_string MUST uniquely identify the change location
+   - Include 3-5 lines of context before AND after the change point
+   - Preserve all whitespace and indentation exactly
 
-CRITICAL REQUIREMENTS FOR USING THIS TOOL:
+2. SINGLE INSTANCE: Changes one instance at a time (unless replace_all=true)
+   - For multiple changes, make separate tool calls
 
-1. UNIQUENESS: The old_string MUST uniquely identify the specific instance you want to change. This means:
-   - Include AT LEAST 3-5 lines of context BEFORE the change point
-   - Include AT LEAST 3-5 lines of context AFTER the change point
-   - Include all whitespace, indentation, and surrounding code exactly as it appears in the file
+3. VERIFICATION: Before editing
+   - Read the file first using Read tool
+   - Check how many instances of target text exist
+   - If multiple matches exist, provide line number hints or more context
 
-2. SINGLE INSTANCE: This tool can only change ONE instance at a time. If you need to change multiple instances:
-   - Make separate calls to this tool for each instance
-   - Each call must uniquely identify its specific instance using extensive context
+WARNINGS:
+- Tool fails if old_string matches multiple locations (without line hints)
+- Tool fails if old_string doesn't match exactly (fuzzy matching may help)
+- Always ensure edit results in valid, idiomatic code
 
-3. VERIFICATION: Before using this tool:
-   - Check how many instances of the target text exist in the file
-   - If multiple instances exist, gather enough context to uniquely identify each one
-   - Plan separate tool calls for each instance
-
-WARNING: If you do not follow these requirements:
-   - The tool will fail if old_string matches multiple locations
-   - The tool will fail if old_string doesn't match exactly (including whitespace)
-   - You may change the wrong instance if you don't include enough context
-
-When making edits:
-   - Ensure the edit results in idiomatic, correct code
-   - Do not leave the code in a broken state
-   - Always use absolute file paths (starting with /)
-
-If you want to create a new file, use:
-   - A new file path, including dir name if needed
-   - An empty old_string
-   - The new file's contents as new_string
-
-Remember: when making multiple file edits in a row to the same file, you should prefer to send all edits in a single message with multiple calls to this tool, rather than multiple messages with a single call each.
+NEW FILE CREATION:
+- Use new file path, empty old_string, and file contents as new_string
 `
