@@ -231,6 +231,27 @@ As long as you have an openai-like endpoint, it should work.
 - `/clear` - Clear conversation history
 - `/init` - Initialize project context
 
+## Configuration
+
+You can configure the following parameters in `~/.kode.json`:
+
+### autoCompactThreshold
+
+Auto-compact trigger threshold (float between 0-1). When context usage exceeds this ratio of the model's limit, automatic compression is triggered.
+
+| Value | Effect                    | Use Case                              |
+|-------|---------------------------|---------------------------------------|
+| 0.80  | Earlier, more conservative | Small context models (e.g. deepseek 131k) |
+| 0.85  | Balanced                  | Medium context models                 |
+| 0.92  | Default                   | Large context models (e.g. Claude 200k)   |
+
+Example:
+```json
+{
+  "autoCompactThreshold": 0.80
+}
+```
+
 ## Multi-Model Intelligent Collaboration
 
 Unlike official Claude which supports only a single model, Kode implements **true multi-model collaboration**, allowing you to fully leverage the unique strengths of different AI models.
