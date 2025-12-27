@@ -173,6 +173,8 @@ export type GlobalConfig = {
   defaultModelName?: string // Default model
   // Update notifications
   lastDismissedUpdateVersion?: string
+  // Auto-compact threshold ratio (0-1), triggers when context usage exceeds this ratio
+  autoCompactThreshold?: number
 }
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
@@ -201,6 +203,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
 
 export const GLOBAL_CONFIG_KEYS = [
   'autoUpdaterStatus',
+  'autoCompactThreshold',
   'theme',
   'hasCompletedOnboarding',
   'lastOnboardingVersion',
