@@ -10,12 +10,31 @@ import { queryLLM } from '@services/claude'
 import { selectAndReadFiles } from './fileRecoveryCore'
 import { addLineNumbers } from './file'
 import { getModelManager } from './model'
+import { getGlobalConfig } from './config'
 
 /**
- * Threshold ratio for triggering automatic context compression
- * When context usage exceeds 92% of the model's limit, auto-compact activates
+ * Default threshold ratio for triggering automatic context compression
+ * When context usage exceeds this ratio of the model's limit, auto-compact activates
+ * Users can override this via `autoCompactThreshold` in global config
  */
-const AUTO_COMPACT_THRESHOLD_RATIO = 0.92
+const DEFAULT_AUTO_COMPACT_THRESHOLD_RATIO = 0.92
+
+/**
+ * Gets the auto-compact threshold ratio from config or uses default
+ * Lower values = more aggressive compression (happens earlier)
+ * Higher values = less aggressive compression (happens later)
+ */
+function getAutoCompactThresholdRatio(): number {
+  const config = getGlobalConfig()
+  const threshold = config.autoCompactThreshold
+
+  // Validate threshold is between 0 and 1
+  if (typeof threshold === 'number' && threshold > 0 && threshold < 1) {
+    return threshold
+  }
+
+  return DEFAULT_AUTO_COMPACT_THRESHOLD_RATIO
+}
 
 /**
  * Retrieves the context length for the main model that should execute compression
@@ -69,10 +88,13 @@ Focus on information essential for continuing the conversation effectively, incl
 /**
  * Calculates context usage thresholds based on the main model's capabilities
  * Uses the main model context length since compression tasks require a capable model
+ *
+ * @param tokenCount Current token count of the conversation
+ * @returns Object with threshold calculation results
  */
 async function calculateThresholds(tokenCount: number) {
   const contextLimit = await getCompressionModelContextLimit()
-  const autoCompactThreshold = contextLimit * AUTO_COMPACT_THRESHOLD_RATIO
+  const autoCompactThreshold = contextLimit * getAutoCompactThresholdRatio()
 
   return {
     isAboveAutoCompactThreshold: tokenCount >= autoCompactThreshold,
