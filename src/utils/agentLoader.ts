@@ -17,12 +17,13 @@ const warnedAgents = new Set<string>()
 
 export interface AgentConfig {
   agentType: string          // Agent identifier (matches subagent_type)
-  whenToUse: string          // Description of when to use this agent  
+  whenToUse: string          // Description of when to use this agent
   tools: string[] | '*'      // Tool permissions
   systemPrompt: string       // System prompt content
   location: 'built-in' | 'user' | 'project'
   color?: string            // Optional UI color
   model_name?: string       // Optional model override
+  temperature?: number      // Optional temperature override (0.0-1.0)
 }
 
 // Built-in general-purpose agent as fallback
@@ -101,6 +102,17 @@ async function scanAgentDirectory(dirPath: string, location: 'user' | 'project')
           warnedAgents.add(frontmatter.name)
         }
         
+        // Parse and validate temperature
+        let temperature: number | undefined
+        if (frontmatter.temperature !== undefined) {
+          const temp = parseFloat(frontmatter.temperature)
+          if (!isNaN(temp) && temp >= 0.0 && temp <= 1.0) {
+            temperature = temp
+          } else if (process.env.KODE_DEBUG_AGENTS) {
+            console.warn(`⚠️ Agent ${frontmatter.name}: Invalid temperature '${frontmatter.temperature}'. Must be 0.0-1.0.`)
+          }
+        }
+
         // Build agent config
         const agent: AgentConfig = {
           agentType: frontmatter.name,
@@ -110,7 +122,8 @@ async function scanAgentDirectory(dirPath: string, location: 'user' | 'project')
           location,
           ...(frontmatter.color && { color: frontmatter.color }),
           // Only use model_name field, ignore deprecated 'model' field
-          ...(frontmatter.model_name && { model_name: frontmatter.model_name })
+          ...(frontmatter.model_name && { model_name: frontmatter.model_name }),
+          ...(temperature !== undefined && { temperature })
         }
         
         agents.push(agent)

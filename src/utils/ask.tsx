@@ -77,10 +77,13 @@ export async function ask({
   if (!result || result.type !== 'assistant') {
     throw new Error('Expected content to be an assistant message')
   }
-  if (result.message.content[0]?.type !== 'text') {
+
+  // Filter out thinking blocks from content
+  const textContent = result.message.content.find(c => c.type === 'text')
+  if (!textContent) {
     throw new Error(
-      `Expected first content item to be text, but got ${JSON.stringify(
-        result.message.content[0],
+      `Expected at least one text content item, but got ${JSON.stringify(
+        result.message.content,
         null,
         2,
       )}`,
@@ -92,7 +95,7 @@ export async function ask({
   overwriteLog(messageHistoryFile, messages)
 
   return {
-    resultText: result.message.content[0].text,
+    resultText: textContent.text,
     totalCost: getTotalCost(),
     messageHistoryFile,
   }

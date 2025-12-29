@@ -23,14 +23,18 @@ import { emitReminderEvent } from '@services/systemReminder'
 import { recordFileEdit } from '@services/fileFreshness'
 import { NotebookEditTool } from '@tools/NotebookEditTool/NotebookEditTool'
 import { DESCRIPTION } from './prompt'
-import { applyEdit } from './utils'
+import { applyEdit, applyEditWithEnhancements } from './utils'
 import { hasWritePermission } from '@utils/permissions/filesystem'
 import { PROJECT_FILE } from '@constants/product'
+import { debug } from '@utils/debugLogger'
 
 const inputSchema = z.strictObject({
   file_path: z.string().describe('The absolute path to the file to modify'),
   old_string: z.string().describe('The text to replace'),
-  new_string: z.string().describe('The text to replace it with'),
+  new_string: z.string().describe('The text to replace it with (must be different from old_string)'),
+  replace_all: z.boolean().optional().default(false).describe('Replace all occurences of old_string (default false)'),
+  old_str_start_line_number: z.number().optional().describe('Optional hint: 1-based start line number of old_string'),
+  old_str_end_line_number: z.number().optional().describe('Optional hint: 1-based end line number of old_string'),
 })
 
 export type In = typeof inputSchema
@@ -121,7 +125,7 @@ export const FileEditTool = {
     }
   },
   async validateInput(
-    { file_path, old_string, new_string },
+    { file_path, old_string, new_string, replace_all, old_str_start_line_number, old_str_end_line_number },
     { readFileTimestamps },
   ) {
     if (old_string === new_string) {
@@ -200,7 +204,17 @@ export const FileEditTool = {
 
     const enc = detectFileEncoding(fullFilePath)
     const file = readFileSync(fullFilePath, enc)
+
+    // Try exact match first
     if (!file.includes(old_string)) {
+      // If line numbers are provided, we might try fuzzy matching later in call()
+      // For now, just indicate the string wasn't found
+      if (old_str_start_line_number !== undefined && old_str_end_line_number !== undefined) {
+        debug.trace('edit', `String not found verbatim, will try fuzzy matching with line hints: ${old_str_start_line_number}-${old_str_end_line_number}`)
+        // Allow validation to pass - we'll try enhanced matching in call()
+        return { result: true }
+      }
+
       return {
         result: false,
         message: `String to replace not found in file.`,
@@ -211,21 +225,29 @@ export const FileEditTool = {
     }
 
     const matches = file.split(old_string).length - 1
-    if (matches > 1) {
+    if (matches > 1 && !replace_all) {
+      // If line numbers are provided, we can try to disambiguate
+      if (old_str_start_line_number !== undefined) {
+        debug.trace('edit', `Found ${matches} matches, will use line number hint to disambiguate`)
+        return { result: true }
+      }
+
       return {
         result: false,
-        message: `Found ${matches} matches of the string to replace. For safety, this tool only supports replacing exactly one occurrence at a time. Add more lines of context to your edit and try again.`,
+        message: `Found ${matches} matches of the string to replace. For safety, this tool only supports replacing exactly one occurrence at a time. Either add more lines of context to your edit, provide line number hints (old_str_start_line_number/old_str_end_line_number), or set replace_all=true.`,
         meta: {
           isFilePathAbsolute: String(isAbsolute(file_path)),
+          matchCount: matches,
         },
       }
     }
 
     return { result: true }
   },
-  async *call({ file_path, old_string, new_string }, { readFileTimestamps }) {
-    const { patch, updatedFile } = applyEdit(file_path, old_string, new_string)
-
+  async *call(
+    { file_path, old_string, new_string, replace_all, old_str_start_line_number, old_str_end_line_number },
+    { readFileTimestamps }
+  ) {
     const fullFilePath = isAbsolute(file_path)
       ? file_path
       : resolve(getCwd(), file_path)
@@ -240,6 +262,26 @@ export const FileEditTool = {
     const originalFile = existsSync(fullFilePath)
       ? readFileSync(fullFilePath, enc)
       : ''
+
+    // Use enhanced editing with fuzzy matching and line number support
+    const { patch, updatedFile, usedFuzzyMatching, matchedLine } = applyEditWithEnhancements(
+      file_path,
+      old_string,
+      new_string,
+      {
+        replaceAll: replace_all || false,
+        startLineNumber: old_str_start_line_number,
+        endLineNumber: old_str_end_line_number,
+        enableFuzzyMatching: true,
+        lineNumberErrorTolerance: 0.2,
+      }
+    )
+
+    // Log if fuzzy matching was used
+    if (usedFuzzyMatching) {
+      debug.trace('edit', `Used fuzzy matching for edit at line ${matchedLine}`)
+    }
+
     writeTextContent(fullFilePath, updatedFile, enc, endings)
 
     // Record Agent edit operation for file freshness tracking
@@ -268,6 +310,8 @@ export const FileEditTool = {
       newString: new_string,
       originalFile,
       structuredPatch: patch,
+      usedFuzzyMatching,
+      matchedLine,
     }
     yield {
       type: 'result',
