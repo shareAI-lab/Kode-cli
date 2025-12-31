@@ -13,7 +13,6 @@ import { getModelManager } from '@utils/model'
 import { debug as debugLogger } from '@utils/log/debugLogger'
 import { logError } from '@utils/log'
 import {
-  AUTO_COMPACT_THRESHOLD_RATIO,
   calculateAutoCompactThresholds,
 } from './autoCompactThreshold'
 
@@ -63,11 +62,7 @@ Focus on information essential for continuing the conversation effectively, incl
 
 async function calculateThresholds(tokenCount: number) {
   const contextLimit = await getMainConversationContextLimit()
-  return calculateAutoCompactThresholds(
-    tokenCount,
-    contextLimit,
-    AUTO_COMPACT_THRESHOLD_RATIO,
-  )
+  return calculateAutoCompactThresholds(tokenCount, contextLimit)
 }
 
 async function shouldAutoCompact(messages: Message[]): Promise<boolean> {

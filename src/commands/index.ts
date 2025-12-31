@@ -2,6 +2,7 @@ import React from 'react'
 import bug from './bug'
 import clear from './clear'
 import compact from './compact'
+import compactThreshold from './compact-threshold'
 import config from './config'
 import cost from './cost'
 import ctxViz from './ctx-viz'
@@ -92,6 +93,7 @@ const COMMANDS = memoize((): Command[] => [
   agents,
   clear,
   compact,
+  compactThreshold,
   config,
   cost,
   doctor,

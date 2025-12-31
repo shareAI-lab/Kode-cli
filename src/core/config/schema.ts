@@ -165,6 +165,7 @@ export type GlobalConfig = {
   }
   primaryProvider?: ProviderType
   maxTokens?: number
+  autoCompactThreshold?: number
   hasAcknowledgedCostThreshold?: boolean
   oauthAccount?: AccountInfo
   proxy?: string
@@ -187,6 +188,7 @@ export const GLOBAL_CONFIG_KEYS = [
   'primaryProvider',
   'preferredNotifChannel',
   'maxTokens',
+  'autoCompactThreshold',
 ] as const
 
 export type GlobalConfigKey = (typeof GLOBAL_CONFIG_KEYS)[number]
@@ -214,4 +216,3 @@ export type ProjectMcpServerDefinitions = {
   mcpJsonPath: string
   mcprcPath: string
 }
-

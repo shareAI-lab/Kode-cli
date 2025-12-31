@@ -231,6 +231,14 @@ As long as you have an openai-like endpoint, it should work.
 - `/config` - Open configuration panel
 - `/cost` - Show token usage and costs
 - `/clear` - Clear conversation history
+- `/compact-threshold` - View or set auto-compact threshold ratio (e.g. `/compact-threshold 0.85` or `/compact-threshold 85%`)
+
+  | Value | Effect | Use Case |
+  |-------|--------|----------|
+  | 0.80 | Compress earlier, more conservative | Small context models (e.g. deepseek 131k) |
+  | 0.85 | Balanced | Medium context models |
+  | 0.90 | Default | Large context models (e.g. Claude 200k) |
+
 - `/init` - Initialize project context
 
 ## Multi-Model Intelligent Collaboration
