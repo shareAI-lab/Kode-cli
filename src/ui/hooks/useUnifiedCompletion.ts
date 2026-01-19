@@ -120,44 +120,58 @@ export function useUnifiedCompletion({
 
     setIsLoadingCommands(true)
     try {
-      const { readdirSync, statSync } = await import('fs')
+      // Use minimal fallback commands immediately to avoid blocking
+      setSystemCommands(getMinimalFallbackCommands())
+
+      // Then load full command list asynchronously without blocking
+      const { readdir, stat } = await import('fs/promises')
       const pathDirs = (process.env.PATH || '').split(':').filter(Boolean)
       const commandSet = new Set<string>()
 
       const essentialCommands = getEssentialCommands()
-
       essentialCommands.forEach(cmd => commandSet.add(cmd))
 
+      // Process directories with small delays to avoid blocking
       for (const dir of pathDirs) {
         try {
-          if (readdirSync && statSync) {
-            const entries = readdirSync(dir)
-            for (const entry of entries) {
-              try {
-                const fullPath = `${dir}/${entry}`
-                const stats = statSync(fullPath)
-                if (stats.isFile() && (stats.mode & 0o111) !== 0) {
-                  commandSet.add(entry)
+          const entries = await readdir(dir).catch(() => [])
+          // Process entries in batches with yields
+          for (let i = 0; i < entries.length; i += 10) {
+            const batch = entries.slice(i, i + 10)
+            await Promise.all(
+              batch.map(async entry => {
+                try {
+                  const fullPath = `${dir}/${entry}`
+                  const stats = await stat(fullPath).catch(() => null)
+                  if (stats?.isFile() && (stats.mode & 0o111) !== 0) {
+                    commandSet.add(entry)
+                  }
+                } catch {
+                  // Ignore errors for individual files
                 }
-              } catch {
-              }
+              }),
+            )
+            // Yield to event loop every batch
+            if (i + 10 < entries.length) {
+              await new Promise(resolve => setImmediate(resolve))
             }
           }
         } catch {
+          // Ignore errors for directories
         }
       }
 
       const commands = Array.from(commandSet).sort()
       setSystemCommands(commands)
-	    } catch (error) {
-	      logError(error)
-	      debugLogger.warn('UNIFIED_COMPLETION_SYSTEM_COMMANDS_LOAD_FAILED', {
-	        error: error instanceof Error ? error.message : String(error),
-	      })
-	      setSystemCommands(getMinimalFallbackCommands())
-	    } finally {
-	      setIsLoadingCommands(false)
-	    }
+    } catch (error) {
+      logError(error)
+      debugLogger.warn('UNIFIED_COMPLETION_SYSTEM_COMMANDS_LOAD_FAILED', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      // Keep minimal fallback commands already set
+    } finally {
+      setIsLoadingCommands(false)
+    }
   }, [systemCommands.length, isLoadingCommands])
 
   useEffect(() => {
@@ -188,14 +202,14 @@ export function useUnifiedCompletion({
       })
 
       setModelSuggestions(suggestions)
-	    } catch (error) {
-	      logError(error)
-	      debugLogger.warn('UNIFIED_COMPLETION_MODELS_LOAD_FAILED', {
-	        error: error instanceof Error ? error.message : String(error),
-	      })
-	      setModelSuggestions([])
-	    }
-	  }, [])
+    } catch (error) {
+      logError(error)
+      debugLogger.warn('UNIFIED_COMPLETION_MODELS_LOAD_FAILED', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      setModelSuggestions([])
+    }
+  }, [])
 
   useEffect(() => {
     getActiveAgents()
@@ -268,14 +282,14 @@ export function useUnifiedCompletion({
         })
         setAgentSuggestions(suggestions)
       })
-	      .catch(error => {
-	        logError(error)
-	        debugLogger.warn('UNIFIED_COMPLETION_AGENTS_LOAD_FAILED', {
-	          error: error instanceof Error ? error.message : String(error),
-	        })
-	        setAgentSuggestions([])
-	      })
-	  }, [])
+      .catch(error => {
+        logError(error)
+        debugLogger.warn('UNIFIED_COMPLETION_AGENTS_LOAD_FAILED', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        setAgentSuggestions([])
+      })
+  }, [])
 
   const generateSuggestions = useCallback(
     (context: CompletionContext): UnifiedSuggestion[] =>
@@ -352,8 +366,6 @@ export function useUnifiedCompletion({
         input.slice(actualEndPos)
       onInputChange(newInput)
       setCursorOffset(context.startPos + completion.length)
-
-
     },
     [input, onInputChange, setCursorOffset, onSubmit, commands],
   )
